@@ -122,9 +122,10 @@ assert_server_object() {
 
 # assert that a lock with the given ID exists on the test server
 assert_server_lock() {
-  local id="$1"
+  local reponame="$1"
+  local id="$2"
 
-  curl -v "$GITSERVER/locks/" \
+  curl -v "$GITSERVER/$reponame.git/info/lfs/locks" \
     -u "user:pass" \
     -o http.json \
     -H "Accept:application/vnd.git-lfs+json" 2>&1 |
@@ -139,9 +140,10 @@ assert_server_lock() {
 
 # refute that a lock with the given ID exists on the test server
 refute_server_lock() {
-  local id="$1"
+  local reponame="$1"
+  local id="$2"
 
-  curl -v "$GITSERVER/locks/" \
+  curl -v "$GITSERVER/$reponame.git/info/lfs/locks" \
     -u "user:pass" \
     -o http.json \
     -H "Accept:application/vnd.git-lfs+json" 2>&1 | tee http.log
@@ -149,6 +151,22 @@ refute_server_lock() {
   grep "200 OK" http.log
 
   [ $(grep -c "$id" http.json) -eq 0 ]
+}
+
+# Assert that .gitattributes contains a given attribute N times
+assert_attributes_count() {
+  local fileext="$1"
+  local attrib="$2"
+  local count="$3"
+
+  pattern="\*.$fileext.*$attrib"
+  actual=$(grep -e "$pattern" .gitattributes | wc -l)
+  if [ "$(printf "%d" "$actual")" != "$count" ]; then
+    echo "wrong number of $attrib entries for $fileext"
+    echo "expected: $count actual: $actual"
+    cat .gitattributes
+    exit 1
+  fi
 }
 
 # pointer returns a string Git LFS pointer file.
@@ -333,7 +351,7 @@ setup() {
   # Set up the initial git config and osx keychain if applicable
   HOME="$TESTHOME"
   mkdir "$HOME"
-  git lfs install
+  git lfs install --skip-repo
   git config --global credential.usehttppath true
   git config --global credential.helper lfstest
   git config --global user.name "Git LFS Tests"
